@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Gemini Chat</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0f14;
+      --surface: #161920;
+      --surface2: #1e2230;
+      --border: #2a2f42;
+      --accent: #7c6aff;
+      --accent-dim: #3d2fcc22;
+      --text: #e8eaf0;
+      --muted: #7a7f96;
+      --success: #4ade80;
+      --error: #f87171;
+      --user-bg: #1f1d36;
+      --ai-bg: #161920;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Header */
+    header {
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+    }
+
+    .logo {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), #c084fc);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 15px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    header span {
+      font-size: 12px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    /* API key bar */
+    #key-bar {
+      background: var(--surface2);
+      border-bottom: 1px solid var(--border);
+      padding: 10px 24px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    #key-bar label {
+      font-size: 12px;
+      color: var(--muted);
+      white-space: nowrap;
+      font-weight: 500;
+    }
+
+    #api-key {
+      flex: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      padding: 6px 10px;
+      border-radius: 6px;
+      outline: none;
+      transition: border-color .2s;
+    }
+
+    #api-key:focus { border-color: var(--accent); }
+
+    #key-status {
+      font-size: 11px;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    #key-status.ok { color: var(--success); }
+    #key-status.err { color: var(--error); }
+
+    /* Chat area */
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      max-width: 760px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .message {
+      display: flex;
+      gap: 12px;
+      animation: fadeUp .25s ease;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .avatar {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+    }
+
+    .message.user .avatar  { background: var(--user-bg); border: 1px solid var(--border); }
+    .message.ai   .avatar  { background: linear-gradient(135deg, var(--accent), #c084fc); }
+
+    .bubble {
+      flex: 1;
+      padding: 12px 16px;
+      border-radius: 12px;
+      line-height: 1.65;
+      font-size: 14px;
+    }
+
+    .message.user .bubble {
+      background: var(--user-bg);
+      border: 1px solid #2d2a55;
+    }
+
+    .message.ai .bubble {
+      background: var(--ai-bg);
+      border: 1px solid var(--border);
+    }
+
+    .bubble pre {
+      background: #0a0c10;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      overflow-x: auto;
+      margin: 8px 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+    }
+
+    .bubble code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: #0a0c10;
+      padding: 1px 5px;
+      border-radius: 4px;
+    }
+
+    .bubble pre code { background: none; padding: 0; }
+
+    .typing-dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+      animation: blink 1.2s infinite;
+      margin: 0 2px;
+    }
+    .typing-dot:nth-child(2) { animation-delay: .2s; }
+    .typing-dot:nth-child(3) { animation-delay: .4s; }
+
+    @keyframes blink {
+      0%, 80%, 100% { opacity: .2; }
+      40% { opacity: 1; }
+    }
+
+    /* Empty state */
+    #empty {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      color: var(--muted);
+      text-align: center;
+      padding: 40px;
+    }
+
+    #empty .big-icon { font-size: 40px; opacity: .4; }
+
+    #empty p { font-size: 14px; max-width: 300px; line-height: 1.6; }
+
+    /* Input area */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 16px 24px;
+      background: var(--surface);
+    }
+
+    #input-wrap {
+      max-width: 760px;
+      margin: 0 auto;
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    #question {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      resize: none;
+      outline: none;
+      min-height: 46px;
+      max-height: 160px;
+      line-height: 1.5;
+      transition: border-color .2s;
+    }
+
+    #question:focus { border-color: var(--accent); }
+    #question::placeholder { color: var(--muted); }
+
+    #send-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      width: 46px; height: 46px;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+      font-size: 18px;
+      transition: background .2s, transform .1s;
+    }
+
+    #send-btn:hover  { background: #6b59ee; }
+    #send-btn:active { transform: scale(.95); }
+    #send-btn:disabled { background: var(--border); cursor: not-allowed; }
+
+    #hint {
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 8px;
+      max-width: 760px;
+      margin-left: auto; margin-right: auto;
+    }
+
+    /* Scrollbar */
+    #chat::-webkit-scrollbar { width: 4px; }
+    #chat::-webkit-scrollbar-track { background: transparent; }
+    #chat::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">✦</div>
+  <h1>Gemini Chat</h1>
+  <span>gemini-2.0-flash</span>
+</header>
+
+<div id="key-bar">
+  <label for="api-key">🔑 Chave API</label>
+  <input type="password" id="api-key" placeholder="Cole sua chave do Google AI Studio aqui…" autocomplete="off" />
+  <span id="key-status">aguardando</span>
+</div>
+
+<div id="chat">
+  <div id="empty">
+    <div class="big-icon">✦</div>
+    <p>Insira sua chave API acima e faça sua primeira pergunta.</p>
+  </div>
+</div>
+
+<footer>
+  <div id="input-wrap">
+    <textarea id="question" rows="1" placeholder="Faça uma pergunta…"></textarea>
+    <button id="send-btn" title="Enviar">➤</button>
+  </div>
+  <p id="hint">Enter para enviar · Shift+Enter para nova linha</p>
+</footer>
+
+<script>
+  const apiKeyInput = document.getElementById('api-key');
+  const keyStatus   = document.getElementById('key-status');
+  const chat        = document.getElementById('chat');
+  const empty       = document.getElementById('empty');
+  const textarea    = document.getElementById('question');
+  const sendBtn     = document.getElementById('send-btn');
+
+  let history = []; // {role, parts:[{text}]}
+
+  // ── Key validation feedback ──────────────────────────────────────
+  apiKeyInput.addEventListener('input', () => {
+    const v = apiKeyInput.value.trim();
+    if (!v) { keyStatus.textContent = 'aguardando'; keyStatus.className = ''; }
+    else if (v.length < 20) { keyStatus.textContent = 'chave muito curta'; keyStatus.className = 'err'; }
+    else { keyStatus.textContent = 'pronta ✓'; keyStatus.className = 'ok'; }
+  });
+
+  // ── Auto-grow textarea ───────────────────────────────────────────
+  textarea.addEventListener('input', () => {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 160) + 'px';
+  });
+
+  textarea.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); }
+  });
+
+  sendBtn.addEventListener('click', send);
+
+  // ── Message rendering ────────────────────────────────────────────
+  function addMessage(role, text) {
+    if (empty) empty.style.display = 'none';
+
+    const wrap = document.createElement('div');
+    wrap.className = `message ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = role === 'user' ? '👤' : '✦';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+
+    if (role === 'ai') {
+      bubble.innerHTML = renderMarkdown(text);
+    } else {
+      bubble.textContent = text;
+    }
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+    return bubble;
+  }
+
+  function addTyping() {
+    const wrap = document.createElement('div');
+    wrap.className = 'message ai';
+    wrap.id = 'typing-msg';
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.textContent = '✦';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+
+    wrap.appendChild(avatar);
+    wrap.appendChild(bubble);
+    chat.appendChild(wrap);
+    chat.scrollTop = chat.scrollHeight;
+    return wrap;
+  }
+
+  // Simple markdown → HTML (bold, italic, inline code, code blocks)
+  function renderMarkdown(text) {
+    return text
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+      .replace(/`([^`]+)`/g, '<code>$1</code>')
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/\*(.+?)\*/g, '<em>$1</em>')
+      .replace(/\n/g, '<br>');
+  }
+
+  // ── Main send function ───────────────────────────────────────────
+  async function send() {
+    const key = apiKeyInput.value.trim();
+    const q   = textarea.value.trim();
+
+    if (!key) {
+      keyStatus.textContent = 'insira sua chave primeiro!';
+      keyStatus.className = 'err';
+      apiKeyInput.focus();
+      return;
+    }
+    if (!q) return;
+
+    // Add user message
+    addMessage('user', q);
+    history.push({ role: 'user', parts: [{ text: q }] });
+
+    textarea.value = '';
+    textarea.style.height = 'auto';
+    sendBtn.disabled = true;
+
+    const typingEl = addTyping();
+
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`;
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: history })
+      });
+
+      typingEl.remove();
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        const msg = err?.error?.message || `Erro ${res.status}`;
+        addMessage('ai', `⚠️ ${msg}`);
+        keyStatus.textContent = 'erro na chave';
+        keyStatus.className = 'err';
+        history.pop();
+        return;
+      }
+
+      const data = await res.json();
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? '(sem resposta)';
+
+      history.push({ role: 'model', parts: [{ text: reply }] });
+      addMessage('ai', reply);
+      keyStatus.textContent = 'pronta ✓';
+      keyStatus.className = 'ok';
+
+    } catch (e) {
+      typingEl.remove();
+      addMessage('ai', `⚠️ Falha na requisição: ${e.message}`);
+      history.pop();
+    } finally {
+      sendBtn.disabled = false;
+      textarea.focus();
+    }
+  }
+</script>
+</body>
+</html>
